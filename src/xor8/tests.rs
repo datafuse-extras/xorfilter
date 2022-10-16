@@ -1,9 +1,15 @@
+use std::collections::hash_map::RandomState;
+use std::hash::BuildHasher;
+use std::hash::Hash;
+use std::hash::Hasher;
+
 use rand::prelude::random;
 use rand::rngs::StdRng;
 use rand::Rng;
 use rand::SeedableRng;
 
-use super::*;
+use crate::BuildHasherDefault;
+use crate::Xor8Builder;
 
 fn generate_unique_keys(rng: &mut StdRng, size: usize) -> Vec<u64> {
     let mut keys: Vec<u64> = Vec::with_capacity(size);
@@ -26,7 +32,7 @@ fn generate_unique_keys(rng: &mut StdRng, size: usize) -> Vec<u64> {
 }
 
 fn test_xor8_build<H>(name: &str, seed: u64, size: u32)
-where H: Default + BuildHasher {
+where H: BuildHasher + Clone + Default {
     let (x, y) = {
         let size = size as usize;
         (size / 3, size / 3)
@@ -35,26 +41,26 @@ where H: Default + BuildHasher {
     println!("test_xor8_build<{}> size:{}", name, size);
     let mut rng = StdRng::seed_from_u64(seed);
 
-    let mut filter = Xor8::<H>::new();
+    let mut builder = Xor8Builder::<H>::new();
     let keys = generate_unique_keys(&mut rng, size as usize);
     let (keys1, keys2, keys3) = (&keys[0..x], &keys[x..x + y], &keys[x + y..]);
 
     // populate api
-    filter.populate(keys1);
+    builder.populate(keys1);
     // populate_keys api
     let digests: Vec<u64> = keys2
         .iter()
         .map(|k| {
-            let mut hasher = filter.get_hasher();
+            let mut hasher = builder.get_hasher();
             k.hash(&mut hasher);
             hasher.finish()
         })
         .collect();
-    filter.populate_keys(&digests);
+    builder.populate_digests(digests.iter());
     // insert api
-    keys3.iter().for_each(|key| filter.insert(key));
+    keys3.iter().for_each(|key| builder.insert(key));
 
-    filter.build().expect("failed build");
+    let filter = builder.build().expect("failed build");
 
     // contains api
     for key in keys.iter() {
@@ -90,28 +96,29 @@ where H: Default + BuildHasher {
 }
 
 fn test_xor8_build_keys<H>(name: &str, seed: u64, size: u32)
-where H: Default + BuildHasher {
+where H: Default + BuildHasher + Clone {
     println!("test_xor8_build_keys<{}> size:{}", name, size);
     let mut rng = StdRng::seed_from_u64(seed);
 
-    let mut filter = Xor8::<H>::new();
+    let mut builder = Xor8Builder::<H>::new();
 
     // build_keys api
     let keys = generate_unique_keys(&mut rng, size as usize);
     let digests: Vec<u64> = keys
         .iter()
         .map(|k| {
-            let mut hasher = filter.get_hasher();
+            let mut hasher = builder.get_hasher();
             k.hash(&mut hasher);
             hasher.finish()
         })
         .collect();
-    filter.build_from_digests(&digests).expect("failed build_keys");
+    let filter = builder.build_from_digests(&digests).expect("failed build_keys");
 
     // contains api
     for key in keys.iter() {
         assert!(filter.contains(key), "key {} not present", key);
     }
+
     // contains_key api
     for digest in digests.into_iter() {
         assert!(
@@ -154,20 +161,20 @@ fn test_xor8_build_keys_simple() {
     println!("test_xor8_build_keys<{}> size:{}", name, size);
     let mut rng = StdRng::seed_from_u64(seed);
 
-    let mut filter = Xor8::<BuildHasherDefault>::new();
+    let mut builder = Xor8Builder::<BuildHasherDefault>::new();
 
     // build_keys api
     let keys = generate_unique_keys(&mut rng, size as usize);
     let digests: Vec<u64> = keys
         .iter()
         .map(|k| {
-            let mut hasher = filter.get_hasher();
+            let mut hasher = builder.get_hasher();
             k.hash(&mut hasher);
             hasher.finish()
         })
         .collect();
 
-    filter.build_from_digests(&digests).expect("failed build_keys");
+    let filter = builder.build_from_digests(&digests).expect("failed build_from_digests");
 
     // contains api
     for key in keys.iter() {
