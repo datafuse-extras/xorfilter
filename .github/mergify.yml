@@ -5,7 +5,7 @@ queue_rules:
       - '#check-success>=2'
       # - check-success=check-subject
       - check-success=xorfilter (stable, --release, test)
-      - check-success~=unittest
+      - check-success~=xorfilter
 
 pull_request_rules:
 
