@@ -120,6 +120,13 @@ where H: BuildHasher + Clone
         self.num_digests += n;
     }
 
+    /// Returns the number of unique digests added so far.
+    ///
+    /// This is useful for obtaining cardinality estimates before building the filter.
+    pub fn digest_count(&self) -> usize {
+        self.digests.len()
+    }
+
     /// Build bitmap for keys that where previously inserted using [Xor8Builder::insert],
     /// [Xor8Builder::populate] and [Xor8Builder::populate_digests] method.
     pub fn build(&mut self) -> Result<Xor8<H>, crate::Error> {
